@@ -1,101 +1,188 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { Suspense } from 'react'
+import Navbar from './components/navbar'
+import HeroSection from './components/landing/HeroSection'
+import FilterBar from './components/filters/FilterBar'
+import ListingCard from './components/listings/ListingCard'
+import RecommendedListings from './components/listings/RecommendedListings'
+import ClientMap from './components/map/ClientMap'
+import { mockListings } from './data/mockListings'
+import { Filters, Listing } from './types'
+import { debounce, searchListings } from './utils/search'
+import HowItWorks from './components/landing/HowItWorks'
+import ScrollRestoration from './components/ScrollRestoration'
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+  const [filters, setFilters] = useState<Filters>({
+    category: '',
+    priceRange: [0, 1000],
+    guestCount: 1,
+    startDate: null,
+    endDate: null,
+  })
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Reset scroll position on mount
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [])
+
+  // Setup debounced search
+  useEffect(() => {
+    const debouncedUpdate = debounce((value: string) => {
+      setDebouncedSearchQuery(value)
+    }, 300)
+
+    debouncedUpdate(searchQuery)
+
+    return () => {
+      // TypeScript doesn't know about the timeout in the debounced function
+      // so we can't clear it here, but it's handled in the debounce function
+    }
+  }, [searchQuery])
+
+  // Filter listings based on search query and filters
+  const filteredListings = useMemo(() => {
+
+    
+    // First apply search ranking
+    let filtered = searchListings(mockListings, debouncedSearchQuery)
+
+    // Then apply additional filters
+    filtered = filtered.filter(listing => {
+      // Category matching - only filter if a category is selected
+      const matchesCategory = !filters.category || filters.category === 'all' || listing.category.toLowerCase() === filters.category.toLowerCase()
+
+      // Price matching
+      const matchesPrice = listing.price >= filters.priceRange[0] && listing.price <= filters.priceRange[1]
+
+      // Guest matching - only filter if guest count is greater than 1
+      const matchesGuests = filters.guestCount <= 1 || listing.maxGuests >= filters.guestCount
+
+      // Date matching (simplified for now)
+      const matchesDates = true
+
+      return matchesCategory && matchesPrice && matchesGuests && matchesDates
+    })
+
+    return filtered
+  }, [debouncedSearchQuery, filters])
+
+  // Handlers
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query)
+    // Scroll to listings section after search
+    const listingsSection = document.getElementById('listings')
+    if (listingsSection) {
+      listingsSection.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      })
+    }
+  }, [])
+
+  const handleFiltersChange = useCallback((newFilters: Filters) => {
+    setFilters(newFilters)
+  }, [])
+
+  return (
+    <main className="min-h-screen">
+      <ScrollRestoration />
+      {/* Navbar */}
+      <Suspense fallback={<div className="h-20 bg-white" />}>
+        <Navbar 
+          onSearch={handleSearch}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+        />
+      </Suspense>
+
+      {/* Hero Section */}
+      <HeroSection 
+        onStartSearch={() => {
+          // First try to find the search trigger button
+          const navbarSearch = document.querySelector('[data-search-trigger]');
+          if (navbarSearch && navbarSearch instanceof HTMLElement) {
+            navbarSearch.click();
+          }
+        }}
+      />
+
+      {/* Filters */}
+      <Suspense fallback={<div className="h-20 bg-white" />}>
+        <FilterBar 
+          filters={filters}
+          onFiltersChange={handleFiltersChange}
+        />
+      </Suspense>
+
+      {/* Listings Section */}
+      <section 
+        id="listings" 
+        className="container mx-auto px-4 py-12 scroll-mt-32"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Listings */}
+          <div className="space-y-8">
+            {/* Initial Recommendations */}
+            {!searchQuery && !filters.category && filters.priceRange[0] === 0 && filters.priceRange[1] === 1000 && (
+              <RecommendedListings allListings={mockListings} />
+            )}
+
+            {/* Filtered Listings */}
+            <div>
+              {filteredListings.length > 0 ? (
+                <>
+                  {(searchQuery || filters.category) && (
+                    <h2 className="text-2xl font-semibold text-gray-900 mb-6">
+                      {searchQuery ? 'Search Results' : 'Featured Listings'}
+                    </h2>
+                  )}
+                  <div className="space-y-6">
+                    {filteredListings.map((listing) => (
+                      <ListingCard key={listing.id} listing={listing} />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-12">
+                  <h3 className="text-2xl font-semibold text-gray-900">No listings found</h3>
+                  <p className="text-gray-600 mt-2">Try adjusting your search or filters</p>
+                </div>
+              )}
+            </div>
+
+            {/* Search-based Recommendations */}
+            {(searchQuery || filters.category) && filteredListings.length > 0 && (
+              <div className="mt-12">
+                <RecommendedListings 
+                  allListings={mockListings} 
+                  currentListingId={filteredListings[0].id}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Map */}
+          <div className="hidden lg:block h-[calc(100vh-6rem)] w-full sticky top-24">
+            <div className="w-full h-full">
+              <ClientMap listings={filteredListings} />
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+      </section>
+
+      {/* How It Works Section */}
+      <HowItWorks onStartSearch={() => {
+        const navbarSearch = document.querySelector('[data-search-trigger]');
+        if (navbarSearch && navbarSearch instanceof HTMLElement) {
+          navbarSearch.click();
+        }
+      }} />
+    </main>
+  )
 }
