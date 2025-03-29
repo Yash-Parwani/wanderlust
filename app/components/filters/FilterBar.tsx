@@ -15,18 +15,11 @@ import { Slider } from '@/components/ui/slider'
 import { categories } from '../../data/categories'
 import { cn } from '@/lib/utils'
 import { FilterBarProps } from '../../types'
-
-interface DateRange {
-  from: Date | undefined
-  to: Date | undefined
-}
+import { DateRange } from 'react-day-picker'
 
 export default function FilterBar({ filters, onFiltersChange }: FilterBarProps) {
   const [selectedCategory, setSelectedCategory] = useState('all')
-  const [date, setDate] = useState<DateRange>({
-    from: undefined,
-    to: undefined,
-  })
+  const [date, setDate] = useState<DateRange | undefined>()
   const [guests, setGuests] = useState(1)
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000])
 
@@ -43,8 +36,9 @@ export default function FilterBar({ filters, onFiltersChange }: FilterBarProps) 
     onFiltersChange({
       ...filters,
       category: selectedCategory,
-      dates: date,
-      guests,
+      startDate: date?.from ?? null,
+      endDate: date?.to ?? null,
+      guestCount: guests,
       priceRange,
     })
   }
@@ -88,12 +82,12 @@ export default function FilterBar({ filters, onFiltersChange }: FilterBarProps) 
                 variant="outline"
                 className={cn(
                   'justify-start text-left font-normal',
-                  !date.from && 'text-muted-foreground'
+                  !date?.from && 'text-muted-foreground'
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {date.from ? (
-                  date.to ? (
+                {date?.from ? (
+                  date?.to ? (
                     <>
                       {format(date.from, 'LLL dd')} - {format(date.to, 'LLL dd')}
                     </>
@@ -109,11 +103,9 @@ export default function FilterBar({ filters, onFiltersChange }: FilterBarProps) 
               <Calendar
                 initialFocus
                 mode="range"
-                defaultMonth={date.from}
+                defaultMonth={date?.from}
                 selected={date}
-                onSelect={(newDate: DateRange | undefined) => {
-                  setDate(newDate ?? { from: undefined, to: undefined })
-                }}
+                onSelect={setDate}
                 numberOfMonths={2}
               />
             </PopoverContent>

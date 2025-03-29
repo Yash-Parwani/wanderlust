@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, Waveform, AlertCircle } from 'lucide-react'
+import { Mic, MicOff, Waves, AlertCircle } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 
 interface VoiceSearchProps {
@@ -194,7 +194,7 @@ const VoiceSearch = ({ isOpen, onClose, onResult }: VoiceSearchProps) => {
               ) : isListening ? (
                 <>
                   <div className="flex items-center justify-center gap-2">
-                    <Waveform className="w-4 h-4 text-purple-500 animate-pulse" />
+                    <Waves className="w-4 h-4 text-purple-500 animate-pulse" />
                     <span className="text-sm font-medium">Listening...</span>
                   </div>
                   {transcript && (
